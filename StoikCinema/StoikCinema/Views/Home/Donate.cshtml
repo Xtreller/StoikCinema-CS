@@ -1,0 +1,140 @@
+﻿@using Microsoft.Extensions.Options
+@inject IOptions<StoikCinema.Services.StripeSettings> Stripe
+@{
+    ViewData["Title"] = "Make a Donation Page";
+}
+@section stripe  {
+
+    <script type="text/javascript">
+        var stripe = Stripe("pk_test_51HKKyiJ1Wp4jNKPfTW5ZzKHgEnZkjgxbdRuh1DjFz6Og48g3d2tz6J8xfNdVzUhesyoRtqv8gCxGrSr7C1sK7uRe00AQrRbxmO");
+
+        var purchase = {
+            items: [{ id: "xl-tshirt" }]
+        };
+
+        document.querySelector("button").disabled = true;
+        fetch("/create-payment-intent", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(purchase)
+        })
+            .then(function (result) {
+                return result.json();
+            })
+            .then(function (data) {
+                var elements = stripe.elements();
+
+                var style = {
+                    base: {
+                        color: "#32325d",
+                        fontFamily: 'Arial, sans-serif',
+                        fontSmoothing: "antialiased",
+                        fontSize: "16px",
+                        "::placeholder": {
+                            color: "#32325d"
+                        }
+                    },
+                    invalid: {
+                        fontFamily: 'Arial, sans-serif',
+                        color: "#fa755a",
+                        iconColor: "#fa755a"
+                    }
+                };
+
+                var card = elements.create("card", { style: style });
+                card.mount("#card-element");
+
+                card.on("change", function (event) {
+                    document.querySelector("button").disabled = event.empty;
+                    document.querySelector("#card-error").textContent = event.error ? event.error.message : "";
+                });
+
+                var form = document.getElementById("payment-form");
+                form.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    payWithCard(stripe, card, data.clientSecret);
+                });
+            });
+        var payWithCard = function (stripe, card, clientSecret) {
+            loading(true);
+            stripe
+                .confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card: card
+                    }
+                })
+                .then(function (result) {
+                    if (result.error) {
+                        showError(result.error.message);
+                    } else {
+                        orderComplete(result.paymentIntent.id);
+                    }
+                });
+        };
+        var orderComplete = function (paymentIntentId) {
+            loading(false);
+            document
+                .querySelector(".result-message a")
+                .setAttribute(
+                    "href",
+                    "https://dashboard.stripe.com/test/payments/" + paymentIntentId
+                );
+            document.querySelector(".result-message").classList.remove("hidden");
+            document.querySelector("button").disabled = true;
+        };
+        var showError = function (errorMsgText) {
+            loading(false);
+            var errorMsg = document.querySelector("#card-error");
+            errorMsg.textContent = errorMsgText;
+            setTimeout(function () {
+                errorMsg.textContent = "";
+            }, 4000);
+        };
+
+        var loading = function (isLoading) {
+            if (isLoading) {
+                document.querySelector("button").disabled = true;
+                document.querySelector("#spinner").classList.remove("hidden");
+                document.querySelector("#button-text").classList.add("hidden");
+            } else {
+                document.querySelector("button").disabled = false;
+                document.querySelector("#spinner").classList.add("hidden");
+                document.querySelector("#button-text").classList.remove("hidden");
+            }
+        };
+
+    </script>
+}
+<div class="text-center m-auto pt-3" style="z-i">
+
+
+</div>
+<div class="background d-flex">
+    <div class="donate align-self-center w-75">
+        <p class="text-white align-self-center ">
+            Една от нашите цели е възстановяване на първото старозагорско кино "Комсомол" , за прожекция на филми от Балканското кино на символична цена. За тази цел се нуждаем от финансова и/или материална помощ относно закупуването и поддръжката на кино техниката и/или поправката на прилежащата техника.
+            Ако желаете да подпомогнете осъществяването на целите на нашето сдружение
+            насочете се към полетата отдолу:
+        </p>
+        <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank" class="w-auto m-auto h-25">
+            <input type="hidden" name="cmd" value="_s-xclick" />
+            <input type="hidden" name="hosted_button_id" value="AEPMQN9G3TWGG" />
+            <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" class="w-auto m-auto h-50" />
+            <img alt="" border="0" src="https://www.paypal.com/en_BG/i/scr/pixel.gif" width="1" height="1" />
+        </form>
+        <form id="payment-form" class="position-relative w-50 m-auto">
+            <div id="card-element"></div>
+            <button id="submit stripeBtn">
+                <div class="spinner hidden" id="spinner"></div>
+                <span id="button-text">Donate 1000 BGN</span>
+            </button>
+            <p id="card-error" role="alert"></p>
+            <p class="result-message hidden text-white">
+                Payment succeeded, see the result in your
+                <a href="" target="_blank">Stripe dashboard.</a> Refresh the page to pay again.
+            </p>
+        </form>
+    </div>
+</div>
